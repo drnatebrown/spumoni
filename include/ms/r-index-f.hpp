@@ -26,6 +26,7 @@
 #define _R_INDEX_F_HH
 
 #include <common.hpp>
+#include <utility>
 
 #include <malloc_count.h>
 
@@ -51,7 +52,6 @@ public:
     } F_block;
 
     typedef size_t size_type;
-
     vector<F_block> LF_table; 
 
     r_index_f() {}
@@ -126,7 +126,7 @@ public:
         return this->F;
     }
 
-    vector<bwt_block> build_LF_table(std::ifstream &heads, std::ifstream &lengths)
+    vector<F_block> build_LF_table(std::ifstream &heads, std::ifstream &lengths)
     {
         heads.clear();
         heads.seekg(0);
@@ -144,13 +144,15 @@ public:
             lengths.read((char *)&length, 5);
             if (c > TERMINATOR)
             {
-                block_table[i] = {c, 0, length, 0};
+                this->LF_table[i].block_character = c;
+                this->LF_table[i].block_length = length
                 L_block_indices[c].push_back(i);
             }
             // check if we can simply assign terminator to C to clean up code
             else
             {
-                block_table[TERMINATOR] = {TERMINATOR, 0, length, 0};
+                this->LF_table[i].block_character = TERMINATOR;
+                this->LF_table[i].block_length = length;
                 L_block_indices[TERMINATOR].push_back(i);
             }
             i++;
@@ -165,7 +167,7 @@ public:
             {
                 for(int j = 0; j < L_block_indices[i].size(); j++) 
                 {
-                    F_block curr_block = LF_block[L_block_indices[i][j]];
+                    F_block* curr_block = &this->LF_table[L_block_indices[i][j]];
 
                     curr_block->block_num = curr_L_num
                     curr_block->block_offset = F_seen - L_seen;
@@ -173,9 +175,9 @@ public:
                     F_seen += curr_block->block_length
                     
                     // Next blocks, sometimes skip
-                    while (F_seen >= L_seen + LF_block[curr_L_num]->block_length) {
+                    while (F_seen >= L_seen + this->LF_table[curr_L_num].block_length) {
                         curr_L_num++;
-                        L_seen += LF_block[curr_L_num]->block_length;
+                        L_seen += this->LF_table[curr_L_num].block_length;
                     }
                 }
             }
@@ -195,15 +197,24 @@ public:
     }
 
     /*
-     * \param i position in the BWT
-     * \param c character
-     * \return lexicographic rank of cw in bwt
+     * \param Block position (RLE blocks)
+     * \param Current character offset in block
+     * \return block position and offset of preceding character
      */
-    ulint LF(ri::ulint block, ri::ulint offset)
+    std::pair<ulint, ulint> LF(ri::ulint block, ri::ulint offset)
     {
-        //TRAVIS
+        ulint next_block = this->LF_table[block].block_num;
+	    ulint next_offset = this->LF_table[block].block_offset + offset;
+
+	    if (next_offset >= this->LF_table[next_block].block_length) {
+            next_offset -= this->LF_table[next_block].block_length;
+            next_block++;
+        }
+	
+	    return std::make_pair(next_block, next_offset);
     }
 
+    // Should serialize the table itself
     /* serialize the structure to the ostream
      * \param out     the ostream
      */
@@ -221,6 +232,7 @@ public:
         return written_bytes;
     }
 
+    // And load table
     /* load the structure from the istream
      * \param in the istream
      */
