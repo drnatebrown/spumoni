@@ -27,6 +27,9 @@
 
 #include <common.hpp>
 #include <utility>
+#include <iostream>
+#include <fstream>  
+#include <algorithm>
 
 #include <malloc_count.h>
 
@@ -43,7 +46,7 @@ class r_index_f : ri::r_index<sparse_bv_type, rle_string_t>
 {
 public:
     // make private
-    struct block_table_row 
+    typedef struct F_block
     {
         char block_character;
         ulint block_num;
@@ -75,9 +78,9 @@ public:
 
         ifs_heads.seekg(0);
         ifs_len.seekg(0);
-        this->build_F_(ifs_heads, ifs_len);
+        //this->build_F_(ifs_heads, ifs_len);
         // Can likely combine parsing when building F and block table
-        this->build_block_table(ifs_heads, ifs_len)
+        this->build_LF_table(ifs_heads, ifs_len);
 
         ri::ulint n = this->bwt.size();
         int log_r = bitsize(uint64_t(this->r));
@@ -93,6 +96,30 @@ public:
         verbose("Simple r-index-f construction complete");
         verbose("Memory peak: ", malloc_count_peak());
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
+    
+        verbose("Inverting BWT from table");
+        // Make into method (only for testing validity)
+        vector<char> to_print = vector<char>();
+        int i = 0;
+        ulint block = 0;
+        ulint offset = 0;
+        int c;
+        do {
+            c = this->LF_table[block].block_character;
+            if(c>TERMINATOR) 
+            {
+                to_print.push_back(char(c));
+                std::pair<ulint, ulint> block_pair = this->LF(block, offset);
+                block = block_pair.first;
+                offset = block_pair.second;
+            }
+        } while(c>TERMINATOR);
+
+        std::ofstream outfile ("recovered.txt");
+        std::reverse(to_print.begin(),to_print.end());
+        std::string recovered = string(to_print.begin(), to_print.end());
+        outfile << recovered;
+        outfile.close();
     }
 
     vector<ulint> build_F_(std::ifstream &heads, std::ifstream &lengths)
@@ -145,7 +172,7 @@ public:
             if (c > TERMINATOR)
             {
                 this->LF_table[i].block_character = c;
-                this->LF_table[i].block_length = length
+                this->LF_table[i].block_length = length;
                 L_block_indices[c].push_back(i);
             }
             // check if we can simply assign terminator to C to clean up code
@@ -161,7 +188,8 @@ public:
         ulint curr_L_num = 0;
         ulint L_seen = 0;
         ulint F_seen = 0;
-        for(i = 0; i < L_block_indices.size(); i++) 
+        // Maybe iterators/foreach would be cleaner (instead of C style)
+        for(ulint i = 0; i < L_block_indices.size(); i++) 
         {
             if (!L_block_indices[i].empty())
             {
@@ -169,15 +197,16 @@ public:
                 {
                     F_block* curr_block = &this->LF_table[L_block_indices[i][j]];
 
-                    curr_block->block_num = curr_L_num
+                    curr_block->block_num = curr_L_num;
                     curr_block->block_offset = F_seen - L_seen;
 
-                    F_seen += curr_block->block_length
+                    F_seen += curr_block->block_length;
                     
                     // Next blocks, sometimes skip
-                    while (F_seen >= L_seen + this->LF_table[curr_L_num].block_length) {
-                        curr_L_num++;
+                    while (F_seen >= L_seen + this->LF_table[curr_L_num].block_length) 
+                    {
                         L_seen += this->LF_table[curr_L_num].block_length;
+                        curr_L_num++;
                     }
                 }
             }
@@ -206,7 +235,7 @@ public:
         ulint next_block = this->LF_table[block].block_num;
 	    ulint next_offset = this->LF_table[block].block_offset + offset;
 
-	    if (next_offset >= this->LF_table[next_block].block_length) {
+	    while (next_offset >= this->LF_table[next_block].block_length) {
             next_offset -= this->LF_table[next_block].block_length;
             next_block++;
         }
@@ -214,7 +243,7 @@ public:
 	    return std::make_pair(next_block, next_offset);
     }
 
-    // Should serialize the table itself
+    // Should serialize the table itself!!!!!!!!!!!!!!
     /* serialize the structure to the ostream
      * \param out     the ostream
      */
@@ -232,7 +261,7 @@ public:
         return written_bytes;
     }
 
-    // And load table
+    // And load table!!!!!!
     /* load the structure from the istream
      * \param in the istream
      */
@@ -243,5 +272,6 @@ public:
         this->bwt.load(in);
         this->r = this->bwt.number_of_runs();
     }
+};
 
 #endif /* end of include guard: _R_INDEX_F_HH */
