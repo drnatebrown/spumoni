@@ -220,7 +220,7 @@ public:
         verbose("BWT Inverted using LF Table");
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
-        std::ofstream recovered_output (filename + ".txt");
+        std::ofstream recovered_output(filename + ".txt");
 
         std::reverse(recovered.begin(), recovered.end());
         std::string recovered_string = string(recovered.begin(), recovered.end());

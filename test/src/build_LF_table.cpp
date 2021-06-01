@@ -42,13 +42,16 @@ int main(int argc, char *const argv[])
   verbose("Building the simple R-Index-F table");
   std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
-  r_index_f<> r_index_f(args.filename);
+  r_index_f<> rf(args.filename);
 
   std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
   verbose("Construction Complete");
   verbose("Memory peak: ", malloc_count_peak());
   verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
+
+  rf.invert_bwt(args.filename);
+  rf.print_stats();
 
   return 0;
 }
