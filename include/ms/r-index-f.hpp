@@ -79,7 +79,7 @@ public:
         ifs_heads.seekg(0);
         ifs_len.seekg(0);
         //this->build_F_(ifs_heads, ifs_len);
-        // Can likely combine parsing when building F and block table
+        // Can combine parsing when building F and block table if both are needed
         this->build_LF_table(ifs_heads, ifs_len);
 
         ri::ulint n = this->bwt.size();
@@ -96,9 +96,9 @@ public:
         verbose("Simple r-index-f construction complete");
         verbose("Memory peak: ", malloc_count_peak());
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
-    
+
+        // FOR TESTING ONLY
         verbose("Inverting BWT from table");
-        // Make into method (only for testing validity)
         vector<char> to_print = vector<char>();
         int i = 0;
         ulint block = 0;
@@ -175,7 +175,7 @@ public:
                 this->LF_table[i].block_length = length;
                 L_block_indices[c].push_back(i);
             }
-            // check if we can simply assign terminator to C to clean up code
+            // check if we can simply assign terminator to c to clean up code
             else
             {
                 this->LF_table[i].block_character = TERMINATOR;
@@ -191,25 +191,22 @@ public:
         // Maybe iterators/foreach would be cleaner (instead of C style)
         for(ulint i = 0; i < L_block_indices.size(); i++) 
         {
-            if (!L_block_indices[i].empty())
+            for(int j = 0; j < L_block_indices[i].size(); j++) 
             {
-                for(int j = 0; j < L_block_indices[i].size(); j++) 
+                F_block* curr_block = &this->LF_table[L_block_indices[i][j]];
+
+                curr_block->block_num = curr_L_num;
+                curr_block->block_offset = F_seen - L_seen;
+
+                F_seen += curr_block->block_length;
+            
+                while (F_seen >= L_seen + this->LF_table[curr_L_num].block_length) 
                 {
-                    F_block* curr_block = &this->LF_table[L_block_indices[i][j]];
-
-                    curr_block->block_num = curr_L_num;
-                    curr_block->block_offset = F_seen - L_seen;
-
-                    F_seen += curr_block->block_length;
-                    
-                    // Next blocks, sometimes skip
-                    while (F_seen >= L_seen + this->LF_table[curr_L_num].block_length) 
-                    {
-                        L_seen += this->LF_table[curr_L_num].block_length;
-                        curr_L_num++;
-                    }
+                    L_seen += this->LF_table[curr_L_num].block_length;
+                    curr_L_num++;
                 }
             }
+    
         }
 
         return this->LF_table;

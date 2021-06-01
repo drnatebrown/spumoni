@@ -48,3 +48,14 @@ target_include_directories(run_spumoni PUBLIC    "../../include/ms"
                                         "${bigbwt_SOURCE_DIR}"
                                         )
 target_compile_options(run_spumoni PUBLIC "-std=c++17")
+
+add_executable(build_LF_table build_LF_table.cpp)
+target_link_libraries(build_LF_table common sdsl divsufsort divsufsort64 malloc_count ri)
+target_include_directories(build_LF_table PUBLIC    "../../include/ms" 
+                                        "../../include/common" 
+                                        "${shaped_slp_SOURCE_DIR}" 
+                                        "${FOLCA_SOURCE_DIR}" 
+                                        "${SUX_SOURCE_DIR}/function" 
+                                        "${SUX_SOURCE_DIR}/support"
+                                        )
+target_compile_options(build_LF_table PUBLIC "-std=c++17")
