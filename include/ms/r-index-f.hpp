@@ -47,13 +47,13 @@ class r_index_f : ri::r_index<sparse_bv_type, rle_string_t>
 {
 public:
 
-    typedef struct F_block
+    struct F_block
     {
         char block_character;
         ulint block_num;
         ulint block_length;
         ulint block_offset;
-    } F_block;
+    };
 
     typedef size_t size_type;
     vector<F_block> LF_table; 
@@ -62,7 +62,7 @@ public:
 
     r_index_f(std::string filename) : ri::r_index<sparse_bv_type, rle_string_t>()
     {
-        verbose("Building the simple r-index-f from BWT");
+        verbose("Building the R-Index-F table from RLE-BWT");
 
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
@@ -93,7 +93,7 @@ public:
 
         std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
-        verbose("Simple r-index-f construction complete");
+        verbose("Simple R-Index-F construction complete");
         verbose("Memory peak: ", malloc_count_peak());
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
     }
@@ -139,7 +139,7 @@ public:
         LF_table = vector<F_block>(this->r);
         vector<vector<size_t>> L_block_indices = vector<vector<size_t>>(256);
         
-        uint8_t c;
+        char c;
         ulint i = 0;
         while ((c = heads.get()) != EOF)
         {
@@ -177,10 +177,9 @@ public:
                 while (F_seen >= L_seen + LF_table[curr_L_num].block_length) 
                 {
                     L_seen += LF_table[curr_L_num].block_length;
-                    curr_L_num++;
+                    ++curr_L_num;
                 }
             }
-    
         }
 
         return LF_table;
@@ -193,7 +192,6 @@ public:
         verbose("Memory consumption (bytes).");
         verbose("   terminator_position: ", sizeof(this->terminator_position));
         verbose("                     F: ", my_serialize(this->F, ns));
-        verbose("              LF Table: ", my_serialize(LF_table, ns));
         verbose("                   bwt: ", this->bwt.serialize(ns));
     }
 
@@ -220,7 +218,7 @@ public:
         verbose("BWT Inverted using LF Table");
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
-        std::ofstream recovered_output(filename + ".txt");
+        std::ofstream recovered_output(filename + ".LF_recovered");
 
         std::reverse(recovered.begin(), recovered.end());
         std::string recovered_string = string(recovered.begin(), recovered.end());
@@ -228,7 +226,7 @@ public:
         recovered_output << recovered_string;
         recovered_output.close();
 
-        verbose("Recovered text from Inversion written to", filename + ".txt")
+        verbose("Recovered text written to", filename + ".LF_recovered");
     }
 
     /*
