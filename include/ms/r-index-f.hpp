@@ -232,7 +232,8 @@ public:
         ulint next_block = this->LF_table[block].block_num;
 	    ulint next_offset = this->LF_table[block].block_offset + offset;
 
-	    while (next_offset >= this->LF_table[next_block].block_length) {
+	    while (next_offset >= this->LF_table[next_block].block_length) 
+        {
             next_offset -= this->LF_table[next_block].block_length;
             next_block++;
         }
