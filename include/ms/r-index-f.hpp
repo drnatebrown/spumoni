@@ -79,9 +79,8 @@ public:
 
         ifs_heads.seekg(0);
         ifs_len.seekg(0);
-        //this->build_F_(ifs_heads, ifs_len);
-        // Can combine parsing when building F and block table if both are needed
-        this->build_LF_table(ifs_heads, ifs_len);
+        this->build_F_(ifs_heads, ifs_len);
+        build_LF_table(ifs_heads, ifs_len);
 
         ri::ulint n = this->bwt.size();
         int log_r = bitsize(uint64_t(this->r));
@@ -97,8 +96,6 @@ public:
         verbose("Simple r-index-f construction complete");
         verbose("Memory peak: ", malloc_count_peak());
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
-
-        
     }
 
     vector<ulint> build_F_(std::ifstream &heads, std::ifstream &lengths)
@@ -139,7 +136,7 @@ public:
         lengths.clear();
         lengths.seekg(0);
 
-        this->LF_table = vector<F_block>(this->r);
+        LF_table = vector<F_block>(this->r);
         vector<vector<size_t>> L_block_indices = vector<vector<size_t>>(256);
         
         uint8_t c;
@@ -154,7 +151,6 @@ public:
                 LF_table[i].block_length = length;
                 L_block_indices[c].push_back(i);
             }
-            // check if we can simply assign terminator to c to clean up code
             else
             {
                 LF_table[i].block_character = TERMINATOR;
@@ -197,35 +193,42 @@ public:
         verbose("Memory consumption (bytes).");
         verbose("   terminator_position: ", sizeof(this->terminator_position));
         verbose("                     F: ", my_serialize(this->F, ns));
+        verbose("              LF Table: ", my_serialize(LF_table, ns));
         verbose("                   bwt: ", this->bwt.serialize(ns));
     }
 
     void invert_bwt(std::string filename) {
         verbose("Inverting BWT from table");
 
-        vector<char> recovered_bwt = vector<char>();
+        std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
-        int i = 0;
+        vector<char> recovered = vector<char>();
         ulint block = 0;
         ulint offset = 0;
-        uint8_t c = LF_table[block].block_character;
-        while(c > TERMINATOR) 
+
+        uint8_t c;
+        while((c = LF_table[block].block_character) > TERMINATOR) 
         {
-            recovered_bwt.push_back(char(c));
+            recovered.push_back(char(c));
             std::pair<ulint, ulint> block_pair = LF(block, offset);
             block = block_pair.first;
             offset = block_pair.second;
-
-            c = LF_table[block].block_character;
         }
 
-        std::ofstream bwt_output (filename + ".txt");
+        std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
-        std::reverse(recovered_bwt.begin(), recovered_bwt.end());
-        std::string recovered_string = string(recovered_bwt.begin(), recovered_bwt.end());
+        verbose("BWT Inverted using LF Table");
+        verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
-        bwt_output << recovered_string;
-        bwt_output.close();
+        std::ofstream recovered_output (filename + ".txt");
+
+        std::reverse(recovered.begin(), recovered.end());
+        std::string recovered_string = string(recovered.begin(), recovered.end());
+
+        recovered_output << recovered_string;
+        recovered_output.close();
+
+        verbose("Recovered text from Inversion written to", filename + ".txt")
     }
 
     /*
@@ -247,7 +250,6 @@ public:
 	    return std::make_pair(next_block, next_offset);
     }
 
-    // Should serialize the table itself!!!!!!!!!!!!!!
     /* serialize the structure to the ostream
      * \param out     the ostream
      */
@@ -259,13 +261,13 @@ public:
         out.write((char *)&this->terminator_position, sizeof(this->terminator_position));
         written_bytes += sizeof(this->terminator_position);
         written_bytes += my_serialize(this->F, out, child, "F");
+        written_bytes += my_serialize(LF_table, out, child, "LF_table");
         written_bytes += this->bwt.serialize(out);
 
         sdsl::structure_tree::add_size(child, written_bytes);
         return written_bytes;
     }
 
-    // And load table!!!!!!
     /* load the structure from the istream
      * \param in the istream
      */
@@ -273,6 +275,7 @@ public:
     {
         in.read((char *)&this->terminator_position, sizeof(this->terminator_position));
         my_load(this->F, in);
+        my_load(LF_table, in);
         this->bwt.load(in);
         this->r = this->bwt.number_of_runs();
     }
