@@ -26,6 +26,7 @@
 #define _R_INDEX_F_HH
 
 #include <common.hpp>
+
 #include <utility>
 #include <iostream>
 #include <fstream>  
@@ -45,7 +46,7 @@ template <class sparse_bv_type = ri::sparse_sd_vector,
 class r_index_f : ri::r_index<sparse_bv_type, rle_string_t>
 {
 public:
-    // make private
+
     typedef struct F_block
     {
         char block_character;
@@ -97,29 +98,7 @@ public:
         verbose("Memory peak: ", malloc_count_peak());
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
-        // FOR TESTING ONLY
-        verbose("Inverting BWT from table");
-        vector<char> to_print = vector<char>();
-        int i = 0;
-        ulint block = 0;
-        ulint offset = 0;
-        int c;
-        do {
-            c = this->LF_table[block].block_character;
-            if(c>TERMINATOR) 
-            {
-                to_print.push_back(char(c));
-                std::pair<ulint, ulint> block_pair = this->LF(block, offset);
-                block = block_pair.first;
-                offset = block_pair.second;
-            }
-        } while(c>TERMINATOR);
-
-        std::ofstream outfile ("recovered.txt");
-        std::reverse(to_print.begin(),to_print.end());
-        std::string recovered = string(to_print.begin(), to_print.end());
-        outfile << recovered;
-        outfile.close();
+        
     }
 
     vector<ulint> build_F_(std::ifstream &heads, std::ifstream &lengths)
@@ -161,9 +140,9 @@ public:
         lengths.seekg(0);
 
         this->LF_table = vector<F_block>(this->r);
-        vector<vector<int>> L_block_indices = vector<vector<int>>(256);
+        vector<vector<size_t>> L_block_indices = vector<vector<size_t>>(256);
         
-        int c;
+        uint8_t c;
         ulint i = 0;
         while ((c = heads.get()) != EOF)
         {
@@ -171,45 +150,44 @@ public:
             lengths.read((char *)&length, 5);
             if (c > TERMINATOR)
             {
-                this->LF_table[i].block_character = c;
-                this->LF_table[i].block_length = length;
+                LF_table[i].block_character = c;
+                LF_table[i].block_length = length;
                 L_block_indices[c].push_back(i);
             }
             // check if we can simply assign terminator to c to clean up code
             else
             {
-                this->LF_table[i].block_character = TERMINATOR;
-                this->LF_table[i].block_length = length;
+                LF_table[i].block_character = TERMINATOR;
+                LF_table[i].block_length = length;
                 L_block_indices[TERMINATOR].push_back(i);
             }
-            i++;
+            ++i;
         }
         
         ulint curr_L_num = 0;
         ulint L_seen = 0;
         ulint F_seen = 0;
-        // Maybe iterators/foreach would be cleaner (instead of C style)
-        for(ulint i = 0; i < L_block_indices.size(); i++) 
+        for(size_t i = 0; i < L_block_indices.size(); ++i) 
         {
-            for(int j = 0; j < L_block_indices[i].size(); j++) 
+            for(size_t j = 0; j < L_block_indices[i].size(); ++j) 
             {
-                F_block* curr_block = &this->LF_table[L_block_indices[i][j]];
+                F_block* curr_block = &LF_table[L_block_indices[i][j]];
 
                 curr_block->block_num = curr_L_num;
                 curr_block->block_offset = F_seen - L_seen;
 
                 F_seen += curr_block->block_length;
             
-                while (F_seen >= L_seen + this->LF_table[curr_L_num].block_length) 
+                while (F_seen >= L_seen + LF_table[curr_L_num].block_length) 
                 {
-                    L_seen += this->LF_table[curr_L_num].block_length;
+                    L_seen += LF_table[curr_L_num].block_length;
                     curr_L_num++;
                 }
             }
     
         }
 
-        return this->LF_table;
+        return LF_table;
     }
 
     void print_stats()
@@ -222,6 +200,34 @@ public:
         verbose("                   bwt: ", this->bwt.serialize(ns));
     }
 
+    void invert_bwt(std::string filename) {
+        verbose("Inverting BWT from table");
+
+        vector<char> recovered_bwt = vector<char>();
+
+        int i = 0;
+        ulint block = 0;
+        ulint offset = 0;
+        uint8_t c = LF_table[block].block_character;
+        while(c > TERMINATOR) 
+        {
+            recovered_bwt.push_back(char(c));
+            std::pair<ulint, ulint> block_pair = LF(block, offset);
+            block = block_pair.first;
+            offset = block_pair.second;
+
+            c = LF_table[block].block_character;
+        }
+
+        std::ofstream bwt_output (filename + ".txt");
+
+        std::reverse(recovered_bwt.begin(), recovered_bwt.end());
+        std::string recovered_string = string(recovered_bwt.begin(), recovered_bwt.end());
+
+        bwt_output << recovered_string;
+        bwt_output.close();
+    }
+
     /*
      * \param Block position (RLE blocks)
      * \param Current character offset in block
@@ -229,13 +235,13 @@ public:
      */
     std::pair<ulint, ulint> LF(ri::ulint block, ri::ulint offset)
     {
-        ulint next_block = this->LF_table[block].block_num;
-	    ulint next_offset = this->LF_table[block].block_offset + offset;
+        ulint next_block = LF_table[block].block_num;
+	    ulint next_offset = LF_table[block].block_offset + offset;
 
-	    while (next_offset >= this->LF_table[next_block].block_length) 
+	    while (next_offset >= LF_table[next_block].block_length) 
         {
-            next_offset -= this->LF_table[next_block].block_length;
-            next_block++;
+            next_offset -= LF_table[next_block].block_length;
+            ++next_block;
         }
 	
 	    return std::make_pair(next_block, next_offset);
