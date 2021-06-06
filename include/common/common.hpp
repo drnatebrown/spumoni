@@ -495,7 +495,66 @@ void my_load(std::vector<X> &x, std::istream &in, typename std::enable_if<std::i
   my_load_vector(x, in);
 }
 
+/*!
+ * \param vec The vector which should be serialized.
+ * \param out Output stream to which should be written.
+ * \param v   Structure tree node. Note: If all elements have the same
+ *            structure, then it is tried to combine all elements (i.e.
+ *            make one node w with size set to the cumulative sum of all
+ *           sizes of the children)
+ */
+template <class T>
+uint64_t
+my_serialize_vector_of_structs(const std::vector<T, std::allocator<T>> &vec, std::ostream &out, sdsl::structure_tree_node *v = nullptr, std::string name = "")
+{
+  size_t written_bytes = sdsl::serialize(vec.size(), out, v, name);
+  if (vec.size() > 0)
+  {
+    sdsl::structure_tree_node *child = sdsl::structure_tree::add_child(v, name, "std::vector<" + sdsl::util::class_name(vec[0]) + ">");
 
+    const T *p = &vec[0];
+    typename std::vector<T>::size_type idx = 0;
+    while (idx + sdsl::conf::SDSL_BLOCK_SIZE < (vec.size()))
+    {
+      out.write((char *)p, sdsl::conf::SDSL_BLOCK_SIZE * sizeof(T));
+      written_bytes += sdsl::conf::SDSL_BLOCK_SIZE * sizeof(T);
+      p += sdsl::conf::SDSL_BLOCK_SIZE;
+      idx += sdsl::conf::SDSL_BLOCK_SIZE;
+    }
+    out.write((char *)p, ((vec.size()) - idx) * sizeof(T));
+    written_bytes += ((vec.size()) - idx) * sizeof(T);
+
+    sdsl::structure_tree::add_size(child, written_bytes);
+  }
+
+  return written_bytes;
+}
+
+//! Load all elements of a vector from a input stream
+/*! \param vec  Vector whose elements should be loaded.
+ *  \param in   Input stream.
+ *  \par Note
+ *   The vector has to be resized prior the loading
+ *   of its elements.
+ */
+template <class T>
+void my_load_vector_of_structs(std::vector<T, std::allocator<T>> &vec, std::istream &in)
+{
+  typename std::vector<T>::size_type size;
+  sdsl::load(size, in);
+  if(size > 0){
+    vec.resize(size);
+    T *p = &vec[0];
+    typename std::vector<T>::size_type idx = 0;
+    while (idx + sdsl::conf::SDSL_BLOCK_SIZE < (vec.size()))
+    {
+      in.read((char *)p, sdsl::conf::SDSL_BLOCK_SIZE * sizeof(T));
+      p += sdsl::conf::SDSL_BLOCK_SIZE;
+      idx += sdsl::conf::SDSL_BLOCK_SIZE;
+    }
+    in.read((char *)p, ((vec.size()) - idx) * sizeof(T));
+  }
+}
 
 
 #endif /* end of include guard: _COMMON_HH */
