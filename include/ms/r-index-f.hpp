@@ -49,24 +49,12 @@ public:
 
     struct F_block
     {
-        size_type serialize(std::ostream& out, sdsl::structure_tree_node *v = nullptr, std::string name="") 
-        {
-            size_type written_bytes = 0;
-
-            written_bytes += block_character.serialize(out, v, name);
-            written_bytes += block_num.serialize(out, v, name);
-            written_bytes += block_length.serialize(out, v, name);
-            written_bytes += block_offset.serialize(out, v, name);
-            
-            return written_bytes;
-        }
-
         char block_character;
         ulint block_num;
         ulint block_length;
         ulint block_offset;
     };
-    
+      
     typedef size_t size_type;
     vector<F_block> LF_table; 
 
