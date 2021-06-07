@@ -20,6 +20,7 @@
 */
 
 #include <iostream>
+#include <fstream> 
 
 #define VERBOSE
 
@@ -43,6 +44,9 @@ int main(int argc, char *const argv[])
   std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
   r_index_f<> rf(args.filename);
+  std::ofstream out("LF_Table.file");
+	rf.serialize(out);
+	out.close();
 
   std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
