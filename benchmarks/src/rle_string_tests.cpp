@@ -53,10 +53,12 @@ int main(int argc, char *const argv[])
     verbose("Matching statistics index construction complete");
     verbose("Memory peak: ", malloc_count_peak());
     verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
-
-    ms.invert_bwt(args.filename);
     
     ms.print_stats();
+
+    ms.invert_bwt(args.filename);
+
+    ms.sample_LF(10000000, 23);
 
     return 0;
 }

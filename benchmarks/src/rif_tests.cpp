@@ -53,9 +53,11 @@ int main(int argc, char *const argv[])
     verbose("Memory peak: ", malloc_count_peak());
     verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
+    rif.print_stats();
+
     rif.invert_bwt(args.filename);
 
-    rif.print_stats();
+    rif.sample_LF(10000000, 23);
 
     return 0;
 }

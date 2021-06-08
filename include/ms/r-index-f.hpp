@@ -28,9 +28,9 @@
 #include <common.hpp>
 
 #include <utility>
-#include <iostream>
-#include <fstream>  
+#include <iostream> 
 #include <algorithm>
+#include <random>
 
 #include <malloc_count.h>
 
@@ -208,16 +208,12 @@ public:
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
         //vector<char> recovered = vector<char>();
-        vector<ulint> blocks = vector<ulint>();
-        vector<ulint> offsets = vector<ulint>();
         ulint block = 0;
         ulint offset = 0;
 
         char c;
         while((c = LF_table[block].block_character) > TERMINATOR) 
         {
-            blocks.push_back(block);
-            offsets.push_back(offset);
             //recovered.push_back(char(c));
             std::pair<ulint, ulint> block_pair = LF(block, offset);
             block = block_pair.first;
@@ -228,12 +224,7 @@ public:
 
         verbose("BWT Inverted using LF Table");
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
-        
-        std::ofstream recovered_output(filename + ".rif.LF_steps");
-        for(size_t i=0;i<blocks.size();++i){
-            recovered_output << blocks[i] << "," << offsets[i] << "\n";
-        }
-        recovered_output.close();
+        verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
 
         /*
         std::ofstream recovered_output(filename + ".LF_recovered");
@@ -246,6 +237,32 @@ public:
 
         verbose("Recovered text written to", filename + ".LF_recovered");
         */
+    }
+
+    void sample_LF(size_t samples, unsigned seed)
+    {
+        verbose("Running random sample of LF steps:");
+
+        std::mt19937 gen(seed);
+        std::uniform_int_distribution<> dist(0, this->bwt.size());
+        vector<std::pair<ulint, ulint>> char_pos = vector<std::pair<ulint, ulint>>(samples);
+        
+        for(size_t i = 0; i < char_pos.size(); ++i)
+        {
+            char_pos[i] = index_to_table(dist(gen));
+        }
+
+        std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
+
+        for(size_t i = 0; i < char_pos.size(); ++i)
+        {
+            LF(char_pos[i].first, char_pos[i].second);
+        }
+
+        std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
+
+        verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
+        verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
     }
 
     /*
@@ -269,7 +286,7 @@ public:
 
     // Takes an index from the BWT and returns the block position and offset in the LF table
     std::pair<ulint, ulint> index_to_table(ulint i){
-        assert(i<this->bwt.n);
+        assert(i<this->bwt.size());
         ulint block = this->bwt.run_of_position(i);
         ulint offset = i - this->bwt.run_range(block).first;
         return std::make_pair(block, offset);

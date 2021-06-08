@@ -245,6 +245,7 @@ public:
 
         verbose("BWT Inverted using RLE String");
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
+        verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
 
         /*
         std::ofstream recovered_output(filename + ".RLE_string_recovered");
@@ -257,6 +258,32 @@ public:
 
         verbose("Recovered text written to", filename + ".RLE_string_recovered");
         */
+    }
+
+    void sample_LF(size_t samples, unsigned seed)
+    {
+        verbose("Running random sample of LF steps:");
+
+        std::mt19937 gen(seed);
+        std::uniform_int_distribution<> dist(0, this->bwt.size());
+        vector<ulint> char_pos = vector<ulint>(samples);
+        
+        for(size_t i = 0; i < char_pos.size(); ++i)
+        {
+            char_pos[i] = dist(gen);
+        }
+
+        std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
+
+        for(size_t i = 0; i < char_pos.size(); ++i)
+        {
+            LF(char_pos[i], this->bwt[char_pos[i]]);
+        }
+
+        std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
+
+        verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
+        verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
     }
 
     /*
