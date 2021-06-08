@@ -20,7 +20,6 @@
 */
 
 #include <iostream>
-#include <fstream> 
 
 #define VERBOSE
 
@@ -43,10 +42,8 @@ int main(int argc, char *const argv[])
   verbose("Building the R-Index-F");
   std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
-  r_index_f<> rf(args.filename);
-  std::ofstream out("LF_Table.file");
-	rf.serialize(out);
-	out.close();
+  
+  r_index_f<> rif(args.filename);
 
   std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
@@ -54,8 +51,14 @@ int main(int argc, char *const argv[])
   verbose("Memory peak: ", malloc_count_peak());
   verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
-  rf.invert_bwt(args.filename);
-  rf.print_stats();
+  std::string outfile = args.filename + rif.get_file_extension();
+  std::ofstream out(outfile);
+  rif.serialize(out);
+
+  t_insert_end = std::chrono::high_resolution_clock::now();
+
+  verbose("Memory peak: ", malloc_count_peak());
+  verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
   return 0;
 }

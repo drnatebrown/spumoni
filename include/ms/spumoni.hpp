@@ -224,6 +224,41 @@ public:
         verbose("            thresholds: ", thresholds.serialize(ns));
     }
 
+    // Lives here for now, can move into tests if we expose the BWT
+    void invert_bwt(std::string filename)
+    {
+        verbose("Inverting BWT");
+
+        std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
+
+        //vector<char> recovered = vector<char>();
+        ulint index = 0;
+        char c;
+
+        while((c = this->bwt[index]) > TERMINATOR) 
+        {
+            //recovered.push_back(char(c));
+            index =  LF(index, c);
+        }
+
+        std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
+
+        verbose("BWT Inverted using RLE String");
+        verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
+
+        /*
+        std::ofstream recovered_output(filename + ".RLE_string_recovered");
+
+        std::reverse(recovered.begin(), recovered.end());
+        std::string recovered_string = string(recovered.begin(), recovered.end());
+
+        recovered_output << recovered_string;
+        recovered_output.close();
+
+        verbose("Recovered text written to", filename + ".RLE_string_recovered");
+        */
+    }
+
     /*
      * \param i position in the BWT
      * \param c character

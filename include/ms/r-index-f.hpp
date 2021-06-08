@@ -54,7 +54,7 @@ public:
         ulint block_length;
         ulint block_offset;
     };
-      
+
     typedef size_t size_type;
     vector<F_block> LF_table; 
 
@@ -79,7 +79,7 @@ public:
 
         ifs_heads.seekg(0);
         ifs_len.seekg(0);
-        this->build_F_(ifs_heads, ifs_len);
+        //this->build_F_(ifs_heads, ifs_len);
         build_LF_table(ifs_heads, ifs_len);
 
         ri::ulint n = this->bwt.size();
@@ -98,6 +98,7 @@ public:
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
     }
 
+    /*
     vector<ulint> build_F_(std::ifstream &heads, std::ifstream &lengths)
     {
         heads.clear();
@@ -128,6 +129,7 @@ public:
             this->F[i] += this->F[i - 1];
         return this->F;
     }
+    */
 
     vector<F_block> build_LF_table(std::ifstream &heads, std::ifstream &lengths)
     {
@@ -191,23 +193,32 @@ public:
 
         verbose("Memory consumption (bytes).");
         verbose("   terminator_position: ", sizeof(this->terminator_position));
-        verbose("                     F: ", my_serialize(this->F, ns));
+        //verbose("                     F: ", my_serialize(this->F, ns));
+        verbose("              LF table: ", my_serialize_vector_of_structs(LF_table, ns));
         verbose("                   bwt: ", this->bwt.serialize(ns));
     }
 
-    void invert_bwt(std::string filename) {
+    // Lives here for now, can move into tests if we expose the LF Table
+    void invert_bwt(std::string filename) 
+    {
+        verbose("R",this->r);
         verbose("Inverting BWT from table");
+        ulint num = 0;
 
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
-        vector<char> recovered = vector<char>();
+        //vector<char> recovered = vector<char>();
+        vector<ulint> blocks = vector<ulint>();
+        vector<ulint> offsets = vector<ulint>();
         ulint block = 0;
         ulint offset = 0;
 
         char c;
         while((c = LF_table[block].block_character) > TERMINATOR) 
         {
-            recovered.push_back(char(c));
+            blocks.push_back(block);
+            offsets.push_back(offset);
+            //recovered.push_back(char(c));
             std::pair<ulint, ulint> block_pair = LF(block, offset);
             block = block_pair.first;
             offset = block_pair.second;
@@ -217,7 +228,14 @@ public:
 
         verbose("BWT Inverted using LF Table");
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
+        
+        std::ofstream recovered_output(filename + ".rif.LF_steps");
+        for(size_t i=0;i<blocks.size();++i){
+            recovered_output << blocks[i] << "," << offsets[i] << "\n";
+        }
+        recovered_output.close();
 
+        /*
         std::ofstream recovered_output(filename + ".LF_recovered");
 
         std::reverse(recovered.begin(), recovered.end());
@@ -227,6 +245,7 @@ public:
         recovered_output.close();
 
         verbose("Recovered text written to", filename + ".LF_recovered");
+        */
     }
 
     /*
@@ -248,6 +267,14 @@ public:
 	    return std::make_pair(next_block, next_offset);
     }
 
+    // Takes an index from the BWT and returns the block position and offset in the LF table
+    std::pair<ulint, ulint> index_to_table(ulint i){
+        assert(i<this->bwt.n);
+        ulint block = this->bwt.run_of_position(i);
+        ulint offset = i - this->bwt.run_range(block).first;
+        return std::make_pair(block, offset);
+    }
+
     /* serialize the structure to the ostream
      * \param out     the ostream
      */
@@ -258,12 +285,17 @@ public:
 
         out.write((char *)&this->terminator_position, sizeof(this->terminator_position));
         written_bytes += sizeof(this->terminator_position);
-        written_bytes += my_serialize(this->F, out, child, "F");
-        written_bytes += my_serialize(LF_table, out, child, "LF_table");
+        //written_bytes += my_serialize(this->F, out, child, "F");
+        written_bytes += my_serialize_vector_of_structs(LF_table, out, child, "LF_table");
         written_bytes += this->bwt.serialize(out);
 
         sdsl::structure_tree::add_size(child, written_bytes);
         return written_bytes;
+    }
+
+    std::string get_file_extension() const
+    {
+        return ".rif";
     }
 
     /* load the structure from the istream
@@ -272,8 +304,8 @@ public:
     void load(std::istream &in)
     {
         in.read((char *)&this->terminator_position, sizeof(this->terminator_position));
-        my_load(this->F, in);
-        my_load(LF_table, in);
+        //my_load(this->F, in);
+        my_load_vector_of_structs(LF_table, in);
         this->bwt.load(in);
         this->r = this->bwt.number_of_runs();
     }
