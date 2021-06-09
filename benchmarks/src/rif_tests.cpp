@@ -23,10 +23,12 @@
 #include <fstream> 
 
 #define VERBOSE
+#define SAMPLES 1000000
+#define SEED 23
 
 #include <common.hpp>
 
-#include <r-index-f.hpp>
+#include <r_index_f.hpp>
 
 #include <malloc_count.h>
 
@@ -36,7 +38,7 @@ int main(int argc, char *const argv[])
     Args args;
     parseArgs(argc, argv, args);
 
-    verbose("Loading the R-Index-F");
+    verbose("Loading the R-Index-F from LF-Table");
     std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
     r_index_f<> rif;
@@ -53,11 +55,18 @@ int main(int argc, char *const argv[])
     verbose("Memory peak: ", malloc_count_peak());
     verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
+    rif.bwt_stats();
     rif.print_stats();
 
     rif.invert_bwt(args.filename);
-
-    rif.sample_LF(10000000, 23);
+    rif.sample_LF(SAMPLES, SEED);
 
     return 0;
 }
+
+/*
+class r_index_f_test : public ToBeTested, public testing::Test
+{
+   // Empty - bridge to protected members for unit-testing
+}
+*/

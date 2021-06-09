@@ -22,6 +22,8 @@
 #include <iostream>
 
 #define VERBOSE
+#define SAMPLES 1000000
+#define SEED 23
 
 #include <common.hpp>
 
@@ -37,7 +39,8 @@ int main(int argc, char *const argv[])
     Args args;
     parseArgs(argc, argv, args);
 
-    verbose("Loading the matching statistics index");
+    verbose("Loading the R-Index from RLE-BWT");
+    
     std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
     ms_pointers<> ms;
@@ -50,15 +53,16 @@ int main(int argc, char *const argv[])
 
     std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
-    verbose("Matching statistics index construction complete");
+    verbose("R-Index load complete");
     verbose("Memory peak: ", malloc_count_peak());
     verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
     
+    ms.bwt_stats();
     ms.print_stats();
 
     ms.invert_bwt(args.filename);
 
-    ms.sample_LF(10000000, 23);
+    ms.sample_LF(SAMPLES, SEED);
 
     return 0;
 }

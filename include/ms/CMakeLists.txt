@@ -1,6 +1,6 @@
 set(MS_SOURCES  ms_rle_string.hpp
 ms_pointers.hpp
-r-index-f.hpp
+r_index_f.hpp
 thresholds_ds.hpp)
 
 add_library(ms OBJECT ${MS_SOURCES})

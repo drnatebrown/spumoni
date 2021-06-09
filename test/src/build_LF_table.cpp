@@ -27,7 +27,7 @@
 
 #include <sdsl/io.hpp>
 
-#include <r-index-f.hpp>
+#include <r_index_f.hpp>
 
 #include <malloc_count.h>
 

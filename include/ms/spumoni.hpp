@@ -224,10 +224,19 @@ public:
         verbose("            thresholds: ", thresholds.serialize(ns));
     }
 
+    void bwt_stats()
+    {
+        verbose("Number of BWT equal-letter runs: r = ", this->r);
+        verbose("Length of complete BWT: n = ", this->bwt.size());
+        verbose("Rate n/r = ", double(this->bwt.size()) / this->r);
+        verbose("log2(r) = ", log2(double(this->r)));
+        verbose("log2(n/r) = ", log2(double(this->bwt.size()) / this->r));
+    }
+
     // Lives here for now, can move into tests if we expose the BWT
     void invert_bwt(std::string filename)
     {
-        verbose("Inverting BWT");
+        verbose("Inverting BWT using R-Index (RLE-String)");
 
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
@@ -245,7 +254,7 @@ public:
 
         verbose("BWT Inverted using RLE String");
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
-        verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
+        verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/this->bwt.size()).count());
 
         /*
         std::ofstream recovered_output(filename + ".RLE_string_recovered");
@@ -262,28 +271,35 @@ public:
 
     void sample_LF(size_t samples, unsigned seed)
     {
-        verbose("Running random sample of LF steps:");
+        verbose("Running random sample of LF steps for R-Index (RLE-String):");
 
         std::mt19937 gen(seed);
         std::uniform_int_distribution<> dist(0, this->bwt.size());
-        vector<ulint> char_pos = vector<ulint>(samples);
+        vector<ulint> pos = vector<ulint>(samples);
+        vector<ulint> next_pos = vector<ulint>(samples);
         
-        for(size_t i = 0; i < char_pos.size(); ++i)
+        for(size_t i = 0; i < pos.size(); ++i)
         {
-            char_pos[i] = dist(gen);
+            pos[i] = dist(gen);
         }
 
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
-        for(size_t i = 0; i < char_pos.size(); ++i)
+        for(size_t i = 0; i < pos.size(); ++i)
         {
-            LF(char_pos[i], this->bwt[char_pos[i]]);
+            next_pos[i] = LF(pos[i], this->bwt[pos[i]]);
         }
 
         std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
+        for(size_t i = 0; i < next_pos.size(); ++i)
+        {
+            cerr << next_pos[i] << "\n"; 
+        }
+
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
         verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
+        verbose("# of samples: ", samples);
     }
 
     /*

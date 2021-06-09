@@ -198,11 +198,19 @@ public:
         verbose("                   bwt: ", this->bwt.serialize(ns));
     }
 
+    void bwt_stats()
+    {
+        verbose("Number of BWT equal-letter runs: r = ", this->r);
+        verbose("Length of complete BWT: n = ", this->bwt.size());
+        verbose("Rate n/r = ", double(this->bwt.size()) / this->r);
+        verbose("log2(r) = ", log2(double(this->r)));
+        verbose("log2(n/r) = ", log2(double(this->bwt.size()) / this->r));
+    }
+
     // Lives here for now, can move into tests if we expose the LF Table
     void invert_bwt(std::string filename) 
     {
-        verbose("R",this->r);
-        verbose("Inverting BWT from table");
+        verbose("Inverting BWT using R-Index-F (LF table)");
         ulint num = 0;
 
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
@@ -224,7 +232,9 @@ public:
 
         verbose("BWT Inverted using LF Table");
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
-        verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
+        verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/this->bwt.size()).count());
+        verbose("# of runs, r: ",this->r);
+        verbose("BWT size, n: ", this->bwt.size());
 
         /*
         std::ofstream recovered_output(filename + ".LF_recovered");
@@ -241,28 +251,36 @@ public:
 
     void sample_LF(size_t samples, unsigned seed)
     {
-        verbose("Running random sample of LF steps:");
+        verbose("Running random sample of LF steps for R-Index-F (LF table):");
 
         std::mt19937 gen(seed);
         std::uniform_int_distribution<> dist(0, this->bwt.size());
-        vector<std::pair<ulint, ulint>> char_pos = vector<std::pair<ulint, ulint>>(samples);
+        vector<std::pair<ulint, ulint>> pos = vector<std::pair<ulint, ulint>>(samples);
+        vector<std::pair<ulint, ulint>> next_pos = vector<std::pair<ulint, ulint>>(samples);
         
-        for(size_t i = 0; i < char_pos.size(); ++i)
+        for(size_t i = 0; i < pos.size(); ++i)
         {
-            char_pos[i] = index_to_table(dist(gen));
+            pos[i] = index_to_table(dist(gen));
         }
 
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
-        for(size_t i = 0; i < char_pos.size(); ++i)
+        for(size_t i = 0; i < pos.size(); ++i)
         {
-            LF(char_pos[i].first, char_pos[i].second);
+            next_pos[i] = LF(pos[i].first, pos[i].second);
         }
 
         std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
+        for(size_t i = 0; i < next_pos.size(); ++i)
+        {
+            ulint pos = this->bwt.run_range(next_pos[i].first).first + next_pos[i].second;
+            cerr << pos << "\n";
+        }
+
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
         verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
+        verbose("# of samples: ", samples);
     }
 
     /*
@@ -280,7 +298,7 @@ public:
             next_offset -= LF_table[next_block].block_length;
             ++next_block;
         }
-	
+
 	    return std::make_pair(next_block, next_offset);
     }
 
