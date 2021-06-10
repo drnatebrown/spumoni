@@ -155,11 +155,11 @@ public:
     ulint run_pos(ulint j)
     {
         assert(j<run_heads.size());
-        ulint this_block = j/B;
-        ulint current_run = this_block*B;
-        ulint pos = (this_block==0?0:runs.select(this_block-1)+1);
+        ulint this_block = j/this->B;
+        ulint current_run = this_block*this->B;
+        ulint pos = (this_block==0?0:this->runs.select(this_block-1)+1);
         while(current_run < j){
-             pos += run_at(current_run);
+             pos += this->run_at(current_run);
             current_run++;
         }
         assert(current_run == j);

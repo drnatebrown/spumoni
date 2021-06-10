@@ -43,7 +43,7 @@
 #include <thresholds_ds.hpp>
 
 template <class sparse_bv_type = ri::sparse_sd_vector,
-          class rle_string_t = ms_rle_string_sd>,
+          class rle_string_t = ms_rle_string_sd,
           class thresholds_t = thr_compressed<rle_string_t> >
 class r_index_f : ri::r_index<sparse_bv_type, rle_string_t>
 {
@@ -283,7 +283,7 @@ public:
         
         for(size_t i = 0; i < pos.size(); ++i)
         {
-            pos[i] = index_to_table(dist(gen));
+            pos[i] = position_to_block(dist(gen));
         }
 
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
@@ -336,7 +336,7 @@ public:
     }
 
     // Takes a block and offset from the LF table and returns position in the BWT
-    std::pair<ulint, ulint> block_to_position(ulint block, ulint offset)
+    ulint block_to_position(ulint block, ulint offset)
     {
         assert(i < LF_table.size());
         ulint pos = this->bwt.run_pos(block) + offset;
@@ -393,7 +393,7 @@ protected:
 
         // Start with the empty string
         auto block = LF_table.size() - 1;
-        auto offset = LF_table[pos].length;
+        auto offset = LF_table[block].length;
         auto length = 0;
 
         for (size_t i = 0; i < m; ++i)
@@ -411,7 +411,7 @@ protected:
             else
             {
                 // Get threshold
-                ri::ulint rnk = this->bwt.head_rank(pos, c);
+                ri::ulint rnk = this->bwt.head_rank(block, c);
                 size_t thr = this->bwt.size() + 1;
 
                 ulint next_block = block;
@@ -436,7 +436,7 @@ protected:
                     length = 0;
 
                     next_block = j;
-                    next_offset = LF_table[next_pos].length;
+                    next_offset = LF_table[next_block].length;
                 }
 
                 block = next_block;
@@ -446,8 +446,8 @@ protected:
             lengths[m - i - 1] = length;
 
             // Perform one backward step
-            std::pair<ulint, ulint> LF_pair = LF(pos, offset);
-            pos = LF_pair.first;
+            std::pair<ulint, ulint> LF_pair = LF(block, offset);
+            block = LF_pair.first;
             offset = LF_pair.second;
         }
 
