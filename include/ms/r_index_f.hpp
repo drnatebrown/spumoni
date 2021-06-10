@@ -390,8 +390,6 @@ protected:
     template<typename string_t>
     std::vector<size_t> _query(const string_t &pattern, const size_t m)
     {
-        std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
-
         std::vector<size_t> lengths(m);
 
         // Start with the empty string
@@ -453,8 +451,6 @@ protected:
             block = LF_pair.first;
             offset = LF_pair.second;
         }
-        std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
-        verbose("Elapsed time (matching statistics):", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
         return lengths;
     }
