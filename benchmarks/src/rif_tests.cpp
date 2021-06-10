@@ -64,7 +64,7 @@ int main(int argc, char *const argv[])
     return 0;
 }
 
-/*
+/* Can move test only methods here, as extensions of base class
 class r_index_f_test : public ToBeTested, public testing::Test
 {
    // Empty - bridge to protected members for unit-testing

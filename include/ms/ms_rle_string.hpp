@@ -141,6 +141,31 @@ public:
         assert(j<=i);
         return this->runs_per_letter[c].select(j-1) + 1; // j-1 because the select is 0 based
     }
+
+    // select in chracters of the i-th run head
+    // i starts from 0!
+    // i.e., the number of characters c before the first character of the run.
+    size_t head_select(const size_t i, const uint8_t c)
+    {
+        assert(i < this->R);
+        return this->runs_per_letter[c].select(i); // j-1 because the select is 0 based
+    }
+
+    // Returns the position in BWT of the j-th run
+    ulint run_pos(ulint j)
+    {
+        assert(j<run_heads.size());
+        ulint this_block = j/B;
+        ulint current_run = this_block*B;
+        ulint pos = (this_block==0?0:runs.select(this_block-1)+1);
+        while(current_run < j){
+             pos += run_at(current_run);
+            current_run++;
+        }
+        assert(current_run == j);
+        return pos;
+    }
+
     /* serialize the structure to the ostream
      * \param out     the ostream
      */
