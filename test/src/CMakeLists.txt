@@ -49,6 +49,14 @@ target_include_directories(run_spumoni PUBLIC    "../../include/ms"
                                         )
 target_compile_options(run_spumoni PUBLIC "-std=c++17")
 
+add_executable(run_LF_table run_LF_table.cpp ${bigbwt_SOURCE_DIR}/xerrors.c)
+target_link_libraries(run_LF_table common sdsl divsufsort divsufsort64 malloc_count ri pthread)
+target_include_directories(run_LF_table PUBLIC    "../../include/ms" 
+                                        "../../include/common" 
+                                        "${bigbwt_SOURCE_DIR}"
+                                        )
+target_compile_options(run_LF_table PUBLIC "-std=c++17")
+
 add_executable(build_LF_table build_LF_table.cpp)
 target_link_libraries(build_LF_table common sdsl divsufsort divsufsort64 malloc_count ri)
 target_include_directories(build_LF_table PUBLIC    "../../include/ms" 
