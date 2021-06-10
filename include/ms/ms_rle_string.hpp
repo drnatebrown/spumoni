@@ -142,13 +142,23 @@ public:
         return this->runs_per_letter[c].select(j-1) + 1; // j-1 because the select is 0 based
     }
 
+    // rank in run head chracters of the i-th run
+    // i.e., the number of run head characters c before the head of i-th run
+    size_t run_rank(const size_t i, const uint8_t c)
+    {
+        assert(i < this->R);
+        size_t j = this->run_heads.rank(i, c);
+        assert(j<=i);
+        return j;
+    }
+
     // select in chracters of the i-th run head
     // i starts from 0!
     // i.e., the number of characters c before the first character of the run.
-    size_t head_select(const size_t i, const uint8_t c)
+    size_t run_select(const size_t i, const uint8_t c)
     {
         assert(i < this->R);
-        return this->runs_per_letter[c].select(i); // j-1 because the select is 0 based
+        return this->run_heads.select(i, c);
     }
 
     // Returns the position in BWT of the j-th run

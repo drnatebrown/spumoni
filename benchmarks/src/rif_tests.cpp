@@ -23,7 +23,7 @@
 #include <fstream> 
 
 #define VERBOSE
-#define SAMPLES 1000000
+#define SAMPLES 10000000
 #define SEED 23
 
 #include <common.hpp>

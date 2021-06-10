@@ -273,8 +273,8 @@ public:
     {
         verbose("Running random sample of LF steps for R-Index (RLE-String):");
 
-        std::mt19937 gen(seed);
-        std::uniform_int_distribution<> dist(0, this->bwt.size());
+        std::mt19937_64 gen(seed);
+        std::uniform_int_distribution<ulint> dist(0, this->bwt.size());
         vector<ulint> pos = vector<ulint>(samples);
         vector<ulint> next_pos = vector<ulint>(samples);
         
@@ -292,10 +292,12 @@ public:
 
         std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
+        /*
         for(size_t i = 0; i < next_pos.size(); ++i)
         {
             cerr << next_pos[i] << "\n"; 
         }
+        */
 
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
         verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
@@ -365,7 +367,7 @@ protected:
     template<typename string_t>
     std::vector<size_t> _query(const string_t &pattern, const size_t m)
     {
-
+        std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
         std::vector<size_t> lengths(m);
 
         // Start with the empty string
@@ -419,12 +421,13 @@ protected:
 
                 pos = next_pos;
             }
-
             lengths[m - i - 1] = length;
 
             // Perform one backward step
             pos = LF(pos, c);
         }
+        std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
+        verbose("Elapsed time (matching statistics):", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
         return lengths;
     }

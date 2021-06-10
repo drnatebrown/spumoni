@@ -276,14 +276,14 @@ public:
     {
         verbose("Running random sample of LF steps for R-Index-F (LF table):");
 
-        std::mt19937 gen(seed);
-        std::uniform_int_distribution<> dist(0, this->bwt.size());
+        std::mt19937_64 gen(seed);
+        std::uniform_int_distribution<ulint> dist(0, this->bwt.size());
         vector<std::pair<ulint, ulint>> pos = vector<std::pair<ulint, ulint>>(samples);
         vector<std::pair<ulint, ulint>> next_pos = vector<std::pair<ulint, ulint>>(samples);
         
         for(size_t i = 0; i < pos.size(); ++i)
         {
-            pos[i] = position_to_block(dist(gen));
+            pos[i] = position_to_table(dist(gen));
         }
 
         std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
@@ -295,11 +295,13 @@ public:
 
         std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
+        /*
         for(size_t i = 0; i < next_pos.size(); ++i)
         {
             ulint pos = this->bwt.run_range(next_pos[i].first).first + next_pos[i].second;
             cerr << pos << "\n";
         }
+        */
 
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
         verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
@@ -326,7 +328,7 @@ public:
     }
 
     // Takes a position from the BWT and returns the block position and offset in the LF table
-    std::pair<ulint, ulint> position_to_block(ulint i){
+    std::pair<ulint, ulint> position_to_table(ulint i){
         assert(i < this->bwt.size());
         ulint block = this->bwt.run_of_position(i);
         assert(block < LF_table.size());
@@ -336,7 +338,7 @@ public:
     }
 
     // Takes a block and offset from the LF table and returns position in the BWT
-    ulint block_to_position(ulint block, ulint offset)
+    ulint table_to_position(ulint block, ulint offset)
     {
         assert(i < LF_table.size());
         ulint pos = this->bwt.run_pos(block) + offset;
@@ -388,12 +390,13 @@ protected:
     template<typename string_t>
     std::vector<size_t> _query(const string_t &pattern, const size_t m)
     {
+        std::chrono::high_resolution_clock::time_point t_insert_start = std::chrono::high_resolution_clock::now();
 
         std::vector<size_t> lengths(m);
 
         // Start with the empty string
         auto block = LF_table.size() - 1;
-        auto offset = LF_table[block].length;
+        auto offset = LF_table[block].length - 1;
         auto length = 0;
 
         for (size_t i = 0; i < m; ++i)
@@ -411,7 +414,7 @@ protected:
             else
             {
                 // Get threshold
-                ri::ulint rnk = this->bwt.head_rank(block, c);
+                ri::ulint rnk = this->bwt.run_rank(block, c);
                 size_t thr = this->bwt.size() + 1;
 
                 ulint next_block = block;
@@ -419,24 +422,24 @@ protected:
 
                 if (rnk < this->bwt.number_of_runs_of_letter(c))
                 {
-                    ri::ulint j = this->bwt.head_select(rnk, c);
+                    ri::ulint j = this->bwt.run_select(rnk, c);
 
                     thr = thresholds[j]; // If it is the first run thr = 0
 
                     length = 0;
 
                     next_block = j;
-                    offset = 0;
+                    next_offset = 0;
                 }
 
-                if (position_of_block(block) < thr)
+                if (table_to_position(block, offset) < thr)
                 {
                     rnk--;
-                    ri::ulint j = this->bwt.head_select(rnk, c);
+                    ri::ulint j = this->bwt.run_select(rnk, c);
                     length = 0;
 
                     next_block = j;
-                    next_offset = LF_table[next_block].length;
+                    next_offset = LF_table[next_block].length - 1;
                 }
 
                 block = next_block;
@@ -450,6 +453,8 @@ protected:
             block = LF_pair.first;
             offset = LF_pair.second;
         }
+        std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
+        verbose("Elapsed time (matching statistics):", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
         return lengths;
     }
