@@ -96,6 +96,10 @@ public:
 
         std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
+        verbose("LF-Table construction complete");
+        verbose("Memory peak: ", malloc_count_peak());
+        verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
+
         verbose("Reading thresholds from file");
 
         t_insert_start = std::chrono::high_resolution_clock::now();
