@@ -145,6 +145,17 @@ public:
     }
     */
 
+    ulint max_length()
+    {
+        ulint max = 0;
+        for(size_t i=0; i<LF_table.size(); i++)
+        {
+            max = (LF_table[i].length>max) ? LF_table[i].length : max;
+        }
+
+        return max;
+    }
+
     vector<F_block> build_LF_table(std::ifstream &heads, std::ifstream &lengths)
     {
         heads.clear();
