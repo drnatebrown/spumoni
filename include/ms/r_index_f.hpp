@@ -105,6 +105,8 @@ public:
         int log_r = bitsize(uint64_t(this->r));
         int log_n = bitsize(uint64_t(this->bwt.size()));
 
+        print_stats();
+
         verbose("Number of BWT equal-letter runs: r = ", this->r);
         verbose("Rate n/r = ", double(this->bwt.size()) / this->r);
         verbose("log2(r) = ", log2(double(this->r)));
@@ -157,25 +159,7 @@ public:
                 lens.push_back(length);
                 L_block_indices[TERMINATOR].push_back(i);
             }
-
-            /*
             ++i;
-            ++b_i;
-
-            // End of block of intervals: compress heads and lengths
-            if (i % BLOCK_SIZE > b)
-            {
-                ++b;
-                b_i = 0;
-
-                i_block curr;
-                curr.heads = wt_huff<rrr_vector<63>>(block_chars);
-                curr.lengths = dac_vector(block_lens);
-
-                block_chars = vector<char>(BLOCK_SIZE);
-                block_lens = vector<ulint>(BLOCK_SIZE);
-            }
-            */
         }
         
         ulint r = chars.size();
@@ -190,7 +174,6 @@ public:
         {
             for(size_t j = 0; j < L_block_indices[i].size(); ++j) 
             {
-                //F_block* curr_block = &LF_table[L_block_indices[i][j]];
                 ulint pos = L_block_indices[i][j];
 
                 intervals[pos] = curr_L_num;
@@ -217,21 +200,46 @@ public:
 
         ulint b = 0;
         ulint b_i = 0;
-        for (size_t i = 0; i < r; ++i) 
+        i = 0;
+        while (i < r) 
         {
-            cout << i << "\n";
+            char c = chars[i];
+            ulint l = lens[i];
+            ulint k = intervals[i];
+            ulint d = offsets[i];
+
+            block_chars[b_i] = c;
+            block_lens[b_i] = l;
+            block_offsets[b_i] = d;
+
+            if (!block_c_map.count(c)) {
+                block_c_map.insert(std::pair<char, ulint>(c, k));
+                bit_diff.insert(std::pair<char, vector<bool>>(c, vector<bool>()));
+            }
+
+            ulint diff = k - block_c_map[c];
+            while (diff > 0) {
+                bit_diff[c].push_back(false);
+                --diff;
+            }
+            bit_diff[c].push_back(true);
+
+            ++i;
+            ++b_i;
 
             // End of block of intervals, update block table
-            if (i/BLOCK_SIZE > b || (i+1) == r)
+            if (i/BLOCK_SIZE > b || i == r)
             {
-                cout << "YEAH" << "b";
+                cout << b << "\n";
+
                 i_block& curr = B_table[b];
 
                 curr.heads = wt_huff<rrr_vector<63>>();
                 // TODO : Write heads to file (slow), or find another way
-                //std::ofstream FILE("blockchar"+b, std::ios::out | std::ofstream::binary);
-                //std::copy(block_chars.begin(), block_chars.end(), std::ostreambuf_iterator<char>(FILE));
-                //construct(curr.heads, "blockchar"+b, 1);
+                std::ofstream FILE("blockchar", std::ios::out | std::ofstream::binary);
+                std::copy(block_chars.begin(), block_chars.end(), std::ostreambuf_iterator<char>(FILE));
+                construct(curr.heads, "blockchar", 1);
+                remove("blockchar");
 
                 curr.lengths = dac_vector(block_lens);
                 curr.offsets = dac_vector(block_offsets);
@@ -253,26 +261,6 @@ public:
                 ++b;
                 b_i = 0;
             }
-
-            char c = chars[i];
-            ulint l = lens[i];
-            ulint d = offsets[i];
-
-            block_chars[b_i] = c;
-            block_lens[b_i] = l;
-            block_offsets[b_i] = d;
-
-            if (!block_c_map.count(c)) {
-                block_c_map.insert(std::pair<char, ulint>(c, l));
-                bit_diff.insert(std::pair<char, vector<bool>>(c, vector<bool>()));
-            }
-
-            ulint diff = l - block_c_map[c];
-            while (diff > 0) {
-                bit_diff[c].push_back(false);
-                --diff;
-            }
-            bit_diff[c].push_back(true);
         }
 
         return B_table;
