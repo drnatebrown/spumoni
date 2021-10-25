@@ -53,7 +53,6 @@ class r_index_f : ri::r_index<sparse_bv_type, rle_string_t>
 {
 public:
     typedef size_t size_type;
-    typedef 
     thresholds_t thresholds;
 
     /*
@@ -69,15 +68,13 @@ public:
 
     struct i_block
     {
-        wt_huff<rrr_vector<63> heads;
+        wt_huff<rrr_vector<63>> heads;
         std::map<char, ulint> c_map;
         std::map<char, rrr_vector<63>> c_diff;
-        dac_vector lengths;
-        dac_vector offsets;
-    }
+        dac_vector<> lengths;
+        dac_vector<> offsets;
+    };
 
-
-    thresholds_t thresholds;
     vector<i_block> B_table; 
 
     r_index_f() {}
@@ -102,7 +99,7 @@ public:
         ifs_heads.seekg(0);
         ifs_len.seekg(0);
         //this->build_F_(ifs_heads, ifs_len);
-        build_B_table(ifs_heads, ifs_len, block_size);
+        build_B_table(ifs_heads, ifs_len);
 
         ri::ulint n = this->bwt.size();
         int log_r = bitsize(uint64_t(this->r));
@@ -115,7 +112,7 @@ public:
 
         std::chrono::high_resolution_clock::time_point t_insert_end = std::chrono::high_resolution_clock::now();
 
-        verbose("LF-Table construction complete");
+        verbose("Block-Table construction complete");
         verbose("Memory peak: ", malloc_count_peak());
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
 
@@ -131,51 +128,7 @@ public:
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
     }
 
-    /*
-    vector<ulint> build_F_(std::ifstream &heads, std::ifstream &lengths)
-    {
-        heads.clear();
-        heads.seekg(0);
-        lengths.clear();
-        lengths.seekg(0);
-
-        this->F = vector<ulint>(256, 0);
-        int c;
-        ulint i = 0;
-        while ((c = heads.get()) != EOF)
-        {
-            size_t length = 0;
-            lengths.read((char *)&length, 5);
-            if (c > TERMINATOR)
-                this->F[c] += length;
-            else
-            {
-                this->F[TERMINATOR] += length;
-                this->terminator_position = i;
-            }
-            i++;
-        }
-        for (ulint i = 255; i > 0; --i)
-            this->F[i] = this->F[i - 1];
-        this->F[0] = 0;
-        for (ulint i = 1; i < 256; ++i)
-            this->F[i] += this->F[i - 1];
-        return this->F;
-    }
-    */
-
-    ulint max_length()
-    {
-        ulint max = 0;
-        for(size_t i=0; i<LF_table.size(); i++)
-        {
-            max = (LF_table[i].length>max) ? LF_table[i].length : max;
-        }
-
-        return max;
-    }
-
-    vector<F_block> build_B_table(std::ifstream &heads, std::ifstream &lengths)
+    vector<i_block> build_B_table(std::ifstream &heads, std::ifstream &lengths)
     {
         heads.clear();
         heads.seekg(0);
@@ -245,9 +198,9 @@ public:
 
                 F_seen += lens[pos];
             
-                while (F_seen >= L_seen + lengths[curr_L_num]) 
+                while (F_seen >= L_seen + lens[curr_L_num]) 
                 {
-                    L_seen += lengths[curr_L_num];
+                    L_seen += lens[curr_L_num];
                     ++curr_L_num;
                 }
             }
@@ -256,18 +209,51 @@ public:
         ulint B_len = (r/BLOCK_SIZE) + ((r % BLOCK_SIZE) != 0);
         B_table = vector<i_block>(B_len);
 
-        ulint b = 0;
-        ulint b_i = 0;
         vector<char> block_chars = vector<char>(BLOCK_SIZE);
         vector<ulint> block_lens = vector<ulint>(BLOCK_SIZE);
         vector<ulint> block_offsets = vector<ulint>(BLOCK_SIZE);
         std::map<char, ulint> block_c_map = std::map<char, ulint>();
-        std::map<char, vector<bool>> bit_diff;
+        std::map<char, vector<bool>> bit_diff = std::map<char, vector<bool>>();
 
         ulint b = 0;
         ulint b_i = 0;
         for (size_t i = 0; i < r; ++i) 
         {
+            cout << i << "\n";
+
+            // End of block of intervals, update block table
+            if (i/BLOCK_SIZE > b || (i+1) == r)
+            {
+                cout << "YEAH" << "b";
+                i_block& curr = B_table[b];
+
+                curr.heads = wt_huff<rrr_vector<63>>();
+                // TODO : Write heads to file (slow), or find another way
+                //std::ofstream FILE("blockchar"+b, std::ios::out | std::ofstream::binary);
+                //std::copy(block_chars.begin(), block_chars.end(), std::ostreambuf_iterator<char>(FILE));
+                //construct(curr.heads, "blockchar"+b, 1);
+
+                curr.lengths = dac_vector(block_lens);
+                curr.offsets = dac_vector(block_offsets);
+                curr.c_map = block_c_map;
+
+                std::map<char, rrr_vector<63>> block_c_diff;
+                for (auto& kv: bit_diff) 
+                {
+                    block_c_diff.insert(std::pair(kv.first, rrr(kv.second)));
+                }
+                curr.c_diff = block_c_diff;
+
+                block_chars = vector<char>(BLOCK_SIZE);
+                block_lens = vector<ulint>(BLOCK_SIZE);
+                block_offsets = vector<ulint>(BLOCK_SIZE);
+                block_c_map = std::map<char, ulint>();
+                bit_diff = std::map<char, vector<bool>>();
+
+                ++b;
+                b_i = 0;
+            }
+
             char c = chars[i];
             ulint l = lens[i];
             ulint d = offsets[i];
@@ -276,9 +262,9 @@ public:
             block_lens[b_i] = l;
             block_offsets[b_i] = d;
 
-            if (!block_c_map.contains(c)) {
+            if (!block_c_map.count(c)) {
                 block_c_map.insert(std::pair<char, ulint>(c, l));
-                bit_diff.insert(std::pair<char, ulint>(c, vector<bool>()));
+                bit_diff.insert(std::pair<char, vector<bool>>(c, vector<bool>()));
             }
 
             ulint diff = l - block_c_map[c];
@@ -286,52 +272,23 @@ public:
                 bit_diff[c].push_back(false);
                 --diff;
             }
-            bit_diff.push_back(true);
-
-            // End of block of intervals, update block table
-            if (i % BLOCK_SIZE > b || (i+1) == r)
-            {
-                i_block& curr = B_table[b];
-
-                curr.heads = wt_huff<rrr_vector<63>>(block_chars);
-                curr.lengths = dac_vector(block_lens);
-                curr.offsets = dav_vector(block_offsets);
-                curr.c_map = block_c_map;
-
-                std::map<char, rrr_vector<63>> block_c_diff;
-                for (auto& [key, value]: bit_diff) 
-                {
-                    block_c_diff.insert(std::pair(key, rrr_vector<63>(value)));
-                }
-                curr.c_diff = block_c_diff;
-
-                B_table.push_back
-
-                block_chars = vector<char>(BLOCK_SIZE);
-                block_lens = vector<ulint>(BLOCK_SIZE);
-                block_offsets = vector<ulint>(BLOCK_SIZE);
-                bit_diff = std::map<char, ulint>();
-
-                ++b;
-                b_i = 0;
-            }
+            bit_diff[c].push_back(true);
         }
 
         return B_table;
     }
 
-    // Computes the matching statistics pointers for the given pattern
-    std::vector<size_t> query(const std::vector<uint8_t> &pattern)
-    {
-        size_t m = pattern.size();
+    rrr_vector<63> rrr(vector<bool> &b){
 
-        return _query(pattern.data(), m);
-    }
+		if(b.size()==0) return rrr_vector<63>();
 
-    std::vector<size_t> query(const char* pattern, const size_t m)
-    {
-        return _query(pattern, m);
-    }
+		bit_vector bv(b.size());
+
+		for(uint64_t i=0;i<b.size();++i)
+			bv[i] = b[i];
+
+		return rrr_vector<63>(bv);
+	}
 
     void print_stats()
     {
@@ -340,7 +297,7 @@ public:
         verbose("Memory consumption (bytes).");
         verbose("   terminator_position: ", sizeof(this->terminator_position));
         //verbose("                     F: ", my_serialize(this->F, ns));
-        verbose("              LF table: ", my_serialize_vector_of_structs(LF_table, ns));
+        verbose("              Block table: ", my_serialize_vector_of_structs(B_table, ns));
         verbose("                   bwt: ", this->bwt.serialize(ns));
     }
 
@@ -354,6 +311,7 @@ public:
     }
 
     // Lives here for now, can move into tests if we expose the LF Table
+    /*
     void invert_bwt(std::string filename) 
     {
         verbose("Inverting BWT using R-Index-F (LF table)");
@@ -392,8 +350,9 @@ public:
         recovered_output.close();
 
         verbose("Recovered text written to", filename + ".LF_recovered");
-        */
+        
     }
+    
 
     void sample_LF(size_t samples, unsigned seed)
     {
@@ -424,7 +383,7 @@ public:
             ulint pos = this->bwt.run_range(next_pos[i].first).first + next_pos[i].second;
             cerr << pos << "\n";
         }
-        */
+        
 
         verbose("Elapsed time (s): ", std::chrono::duration<double, std::ratio<1>>(t_insert_end - t_insert_start).count());
         verbose("Average step (ns): ", std::chrono::duration<double, std::ratio<1, 1000000000>>((t_insert_end - t_insert_start)/samples).count());
@@ -435,7 +394,6 @@ public:
      * \param Block position (RLE blocks)
      * \param Current character offset in block
      * \return block position and offset of preceding character
-     */
     std::pair<ulint, ulint> LF(ri::ulint block, ri::ulint offset)
     {
         ulint next_block = LF_table[block].block;
@@ -468,6 +426,7 @@ public:
         assert(pos < this->bwt.size());
         return pos;
     }
+    */
 
     /* serialize the structure to the ostream
      * \param out     the ostream
@@ -480,7 +439,7 @@ public:
         out.write((char *)&this->terminator_position, sizeof(this->terminator_position));
         written_bytes += sizeof(this->terminator_position);
         //written_bytes += my_serialize(this->F, out, child, "F");
-        written_bytes += my_serialize_vector_of_structs(LF_table, out, child, "LF_table");
+        written_bytes += my_serialize_vector_of_structs(B_table, out, child, "B_table");
         written_bytes += this->bwt.serialize(out);
 
         written_bytes += thresholds.serialize(out, child, "thresholds");
@@ -501,81 +460,11 @@ public:
     {
         in.read((char *)&this->terminator_position, sizeof(this->terminator_position));
         //my_load(this->F, in);
-        my_load_vector_of_structs(LF_table, in);
+        my_load_vector_of_structs(B_table, in);
         this->bwt.load(in);
         this->r = this->bwt.number_of_runs();
 
         thresholds.load(in,&this->bwt);
-    }
-
-protected:
-    // Computes the matching statistics pointers for the given pattern
-    template<typename string_t>
-    std::vector<size_t> _query(const string_t &pattern, const size_t m)
-    {
-        std::vector<size_t> lengths(m);
-
-        // Start with the empty string
-        auto block = LF_table.size() - 1;
-        auto offset = LF_table[block].length - 1;
-        auto length = 0;
-
-        for (size_t i = 0; i < m; ++i)
-        {
-            auto c = pattern[m - i - 1];
-
-            if (this->bwt.number_of_letter(c) == 0)
-            {
-                length = 0;
-            }
-            else if (block < LF_table.size() && offset < LF_table[block].length && LF_table[block].character == c)
-            {
-                length++;
-            }
-            else
-            {
-                // Get threshold
-                ri::ulint rnk = this->bwt.run_rank(block, c);
-                size_t thr = this->bwt.size() + 1;
-
-                ulint next_block = block;
-                ulint next_offset = offset;
-
-                if (rnk < this->bwt.number_of_runs_of_letter(c))
-                {
-                    ri::ulint j = this->bwt.run_select(rnk, c);
-
-                    thr = thresholds[j]; // If it is the first run thr = 0
-
-                    length = 0;
-
-                    next_block = j;
-                    next_offset = 0;
-                }
-
-                if (table_to_position(block, offset) < thr)
-                {
-                    rnk--;
-                    ri::ulint j = this->bwt.run_select(rnk, c);
-                    length = 0;
-
-                    next_block = j;
-                    next_offset = LF_table[next_block].length - 1;
-                }
-
-                block = next_block;
-                offset = next_offset;
-            }
-
-            lengths[m - i - 1] = length;
-
-            // Perform one backward step
-            std::pair<ulint, ulint> LF_pair = LF(block, offset);
-            block = LF_pair.first;
-            offset = LF_pair.second;
-        }
-
-        return lengths;
     }
 };
 
