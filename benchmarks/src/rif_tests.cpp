@@ -57,10 +57,9 @@ int main(int argc, char *const argv[])
 
     rif.bwt_stats();
     rif.print_stats();
-    verbose("MAX:",rif.max_length());
 
     rif.invert_bwt(args.filename);
-    //rif.sample_LF(SAMPLES, SEED);
+    rif.sample_LF(SAMPLES, SEED);
 
     return 0;
 }

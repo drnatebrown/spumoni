@@ -36,11 +36,15 @@
 
 #include <sdsl/rmq_support.hpp>
 #include <sdsl/int_vector.hpp>
+#include <sdsl/wavelet_trees.hpp>
+#include <sdsl/dac_vector.hpp>
 
 #include <r_index.hpp>
 
 #include <ms_rle_string.hpp>
 #include <thresholds_ds.hpp>
+
+static const int BLOCK_SIZE = 1024;
 
 template <class sparse_bv_type = ri::sparse_sd_vector,
           class rle_string_t = ms_rle_string_sd,
@@ -48,18 +52,33 @@ template <class sparse_bv_type = ri::sparse_sd_vector,
 class r_index_f : ri::r_index<sparse_bv_type, rle_string_t>
 {
 public:
+    typedef size_t size_type;
+    typedef 
     thresholds_t thresholds;
 
-    struct F_block
+    /*
+    enum
     {
-        char character;
-        ulint block;
-        ulint length;
-        ulint offset;
-    };
+        BIT_A = 0x0;
+        BIT_C = 0x1;
+        BIT_G = 0x2;
+        BIT_T = 0x3;
+        BIT_TERMINAL = 0x4;
+    }
+    */
 
-    typedef size_t size_type;
-    vector<F_block> LF_table; 
+    struct i_block
+    {
+        wt_huff<rrr_vector<63> heads;
+        std::map<char, ulint> c_map;
+        std::map<char, rrr_vector<63>> c_diff;
+        dac_vector lengths;
+        dac_vector offsets;
+    }
+
+
+    thresholds_t thresholds;
+    vector<i_block> B_table; 
 
     r_index_f() {}
 
@@ -83,7 +102,7 @@ public:
         ifs_heads.seekg(0);
         ifs_len.seekg(0);
         //this->build_F_(ifs_heads, ifs_len);
-        build_LF_table(ifs_heads, ifs_len);
+        build_B_table(ifs_heads, ifs_len, block_size);
 
         ri::ulint n = this->bwt.size();
         int log_r = bitsize(uint64_t(this->r));
@@ -156,15 +175,16 @@ public:
         return max;
     }
 
-    vector<F_block> build_LF_table(std::ifstream &heads, std::ifstream &lengths)
+    vector<F_block> build_B_table(std::ifstream &heads, std::ifstream &lengths)
     {
         heads.clear();
         heads.seekg(0);
         lengths.clear();
         lengths.seekg(0);
-
-        LF_table = vector<F_block>(this->r);
+        
         vector<vector<size_t>> L_block_indices = vector<vector<size_t>>(256);
+        vector<char> chars = vector<char>();
+        vector<ulint> lens = vector<ulint>();
         
         char c;
         ulint i = 0;
@@ -174,19 +194,42 @@ public:
             lengths.read((char *)&length, 5);
             if (c > TERMINATOR)
             {
-                LF_table[i].character = c;
-                LF_table[i].length = length;
+                chars.push_back(c);
+                lens.push_back(length);
                 L_block_indices[c].push_back(i);
             }
             else
             {
-                LF_table[i].character = TERMINATOR;
-                LF_table[i].length = length;
+                chars.push_back(TERMINATOR);
+                lens.push_back(length);
                 L_block_indices[TERMINATOR].push_back(i);
             }
+
+            /*
             ++i;
+            ++b_i;
+
+            // End of block of intervals: compress heads and lengths
+            if (i % BLOCK_SIZE > b)
+            {
+                ++b;
+                b_i = 0;
+
+                i_block curr;
+                curr.heads = wt_huff<rrr_vector<63>>(block_chars);
+                curr.lengths = dac_vector(block_lens);
+
+                block_chars = vector<char>(BLOCK_SIZE);
+                block_lens = vector<ulint>(BLOCK_SIZE);
+            }
+            */
         }
         
+        ulint r = chars.size();
+
+        vector<ulint> intervals = vector<ulint>(r);
+        vector<ulint> offsets = vector<ulint>(r);
+
         ulint curr_L_num = 0;
         ulint L_seen = 0;
         ulint F_seen = 0;
@@ -194,22 +237,87 @@ public:
         {
             for(size_t j = 0; j < L_block_indices[i].size(); ++j) 
             {
-                F_block* curr_block = &LF_table[L_block_indices[i][j]];
+                //F_block* curr_block = &LF_table[L_block_indices[i][j]];
+                ulint pos = L_block_indices[i][j];
 
-                curr_block->block = curr_L_num;
-                curr_block->offset = F_seen - L_seen;
+                intervals[pos] = curr_L_num;
+                offsets[pos] = F_seen - L_seen;
 
-                F_seen += curr_block->length;
+                F_seen += lens[pos];
             
-                while (F_seen >= L_seen + LF_table[curr_L_num].length) 
+                while (F_seen >= L_seen + lengths[curr_L_num]) 
                 {
-                    L_seen += LF_table[curr_L_num].length;
+                    L_seen += lengths[curr_L_num];
                     ++curr_L_num;
                 }
             }
         }
 
-        return LF_table;
+        ulint B_len = (r/BLOCK_SIZE) + ((r % BLOCK_SIZE) != 0);
+        B_table = vector<i_block>(B_len);
+
+        ulint b = 0;
+        ulint b_i = 0;
+        vector<char> block_chars = vector<char>(BLOCK_SIZE);
+        vector<ulint> block_lens = vector<ulint>(BLOCK_SIZE);
+        vector<ulint> block_offsets = vector<ulint>(BLOCK_SIZE);
+        std::map<char, ulint> block_c_map = std::map<char, ulint>();
+        std::map<char, vector<bool>> bit_diff;
+
+        ulint b = 0;
+        ulint b_i = 0;
+        for (size_t i = 0; i < r; ++i) 
+        {
+            char c = chars[i];
+            ulint l = lens[i];
+            ulint d = offsets[i];
+
+            block_chars[b_i] = c;
+            block_lens[b_i] = l;
+            block_offsets[b_i] = d;
+
+            if (!block_c_map.contains(c)) {
+                block_c_map.insert(std::pair<char, ulint>(c, l));
+                bit_diff.insert(std::pair<char, ulint>(c, vector<bool>()));
+            }
+
+            ulint diff = l - block_c_map[c];
+            while (diff > 0) {
+                bit_diff[c].push_back(false);
+                --diff;
+            }
+            bit_diff.push_back(true);
+
+            // End of block of intervals, update block table
+            if (i % BLOCK_SIZE > b || (i+1) == r)
+            {
+                i_block& curr = B_table[b];
+
+                curr.heads = wt_huff<rrr_vector<63>>(block_chars);
+                curr.lengths = dac_vector(block_lens);
+                curr.offsets = dav_vector(block_offsets);
+                curr.c_map = block_c_map;
+
+                std::map<char, rrr_vector<63>> block_c_diff;
+                for (auto& [key, value]: bit_diff) 
+                {
+                    block_c_diff.insert(std::pair(key, rrr_vector<63>(value)));
+                }
+                curr.c_diff = block_c_diff;
+
+                B_table.push_back
+
+                block_chars = vector<char>(BLOCK_SIZE);
+                block_lens = vector<ulint>(BLOCK_SIZE);
+                block_offsets = vector<ulint>(BLOCK_SIZE);
+                bit_diff = std::map<char, ulint>();
+
+                ++b;
+                b_i = 0;
+            }
+        }
+
+        return B_table;
     }
 
     // Computes the matching statistics pointers for the given pattern
