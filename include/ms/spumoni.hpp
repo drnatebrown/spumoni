@@ -121,6 +121,8 @@ public:
 
         verbose("Reading thresholds from file");
 
+        invert_bwt(filename);
+
         t_insert_start = std::chrono::high_resolution_clock::now();
 
         thresholds = thresholds_t(filename,&this->bwt);

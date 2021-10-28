@@ -36,9 +36,6 @@
 #include <sdsl/wavelet_trees.hpp>
 #include <sdsl/dac_vector.hpp>
 
-#include <ms_rle_string.hpp>
-#include <thresholds_ds.hpp>
-
 #include <r_index.hpp>
 
 #include <ms_rle_string.hpp>
