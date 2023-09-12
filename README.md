@@ -1,143 +1,94 @@
-# SPUMONI
-<!--- ```console
-      _____ _____  _    _ __  __  ____  _   _ _____ 
-     / ____|  __ \| |  | |  \/  |/ __ \| \ | |_   _|
-    | (___ | |__) | |  | | \  / | |  | |  \| | | |  
-     \___ \|  ___/| |  | | |\/| | |  | | . ` | | |  
-     ____) | |    | |__| | |  | | |__| | |\  |_| |_ 
-    |_____/|_|     \____/|_|  |_|\____/|_| \_|_____|
-                                            ver 0.1.0
-```
--->
+# SPUMONI :ice_cream: ![GitHub release (latest by date)](https://img.shields.io/github/v/release/oma219/spumoni) ![GitHub](https://img.shields.io/github/license/oma219/spumoni?color=green) [![DOI](https://zenodo.org/badge/349620746.svg)](https://zenodo.org/badge/latestdoi/349620746)
 
-<img src="../assets/spumoni_pic.jpeg" width="500">
 
-Pan-genomic Matching Statistics for Targeted Nanopore Sequencing
+SPUMONI is a software tool for **performing rapid read classifications on sequencing reads using a read's matching statistics (or a related quantity called pseudo-matching lengths).** 
 
-Based on `MONI`: A MEM-finder with Multi-Genome References.
+SPUMONI is based on another software tool called [MONI](https://github.com/maxrossi91/moni) which is a MEM-finder and aligner for pan-genomes. `MONI` uses prefix-free parsing of the text [2][3] to build the Burrows-Wheeler Transform (BWT) of the reference collection, the suffix array (SA) samples at the beginning and end of each run, and the threshold positions[1]. 
 
-`MONI` index uses the prefix-free parsing of the text [2][3] to build the Burrows-Wheeler Transform (BWT) of the reference genomes, the suffix array (SA) samples at the beginning and at the end of each run of the BWT, and the threshold positions of [1]. 
+**For more details on installation/using SPUMONI, please refer to the [wiki page](https://github.com/oma219/spumoni/wiki/1.-Home) which covers those areas in detail.**
 
-*Current Version:* 0.1.0
+## Getting Started
+There are two ways to use SPUMONI. The easier way would be to use the Docker/Singularity images which have SPUMONI pre-installed and ready to use. The other way would be to clone this GitHub repo as shown below and build from the source files. 
 
-# Usage
-
-### Construction of the Index:
-```
-usage: moni build [-h] -r REFERENCE [-w WSIZE] [-p MOD] [-t THREADS] [-k] [-v]
-                  [-f] [--moni-ms] [--spumoni]
-  -h, --help            show this help message and exit
-  -r REFERENCE, --reference REFERENCE
-                        reference file name (default: None)
-  -w WSIZE, --wsize WSIZE
-                        sliding window size (default: 10)
-  -p MOD, --mod MOD     hash modulus (default: 100)
-  -t THREADS, --threads THREADS
-                        number of helper threads (default: 0)
-  -k                    keep temporary files (default: False)
-  -v                    verbose (default: False)
-  -f                    read fasta (default: False)
-  --moni-ms             build moni index for matching statistics only
-                        (default: False)
-  --spumoni             build spumoni index (default: True)
+**(1) Use Docker or Singularity Containers**
 
 ```
-The default index is the `spumoni` index. If you want to build the `moni-ms` index you can use the `--moni-ms` flag. If you want to build both you can use `--moni-ms --spumoni`. Building `moni-ms` and `spumoni` together is faster than building them separately.
-
-### Compute the matching statistics (MSs) with MONI-ms:
-```
-usage: moni ms [-h] -i INDEX -p PATTERN [-o OUTPUT] [-t THREADS]
-  -h, --help            show this help message and exit
-  -i INDEX, --index INDEX
-                        reference index base name (default: None)
-  -p PATTERN, --pattern PATTERN
-                        the input query (default: None)
-  -o OUTPUT, --output OUTPUT
-                        output directory path (default: .)
-  -t THREADS, --threads THREADS
-                        number of helper threads (default: 1)
+docker pull oma219/spumoni:latest
+docker run oma219/spumoni spumoni -h
 ```
 
-### Compute the pseudo matching lengths (PMLs) with SPUMONI:
-```
-usage: moni pseudo-ms [-h] -i INDEX -p PATTERN [-o OUTPUT] [-t THREADS]
-  -h, --help            show this help message and exit
-  -i INDEX, --index INDEX
-                        reference index base name (default: None)
-  -p PATTERN, --pattern PATTERN
-                        the input query (default: None)
-  -o OUTPUT, --output OUTPUT
-                        output directory path (default: .)
-  -t THREADS, --threads THREADS
-                        number of helper threads (default: 1)
-```
-### Analyzing either MSs/PMLs from MONI-ms or SPUMONI
+Since `docker` requires root permissions, `singularity` can be used instead on shared clusters as shown below.
 
 ```
-usage: python3 analyze_pml.py [-h] -p POS_DATA_FILE -n NULL_DATA_FILE [--ms] \
-                              [-k KS_STAT_THRESHOLD] [-r REGION_SIZE] [-o OUTPUT_FILE]
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -p POS_DATA_FILE      
-            path to PMLS or MSs generated with respect to positive index.
-  -n NULL_DATA_FILE     
-            path to PMLS or MSs generated with respect to null index.
-  --ms                  
-            use MSs instead of PMLs. (Default: Assumes input is PMLs)
-  -k KS_STAT_THRESHOLD, --ks-stat KS_STAT_THRESHOLD 
-            set the threshold for Kolmogorov-Smirnov Statistic. (Default: 0.10 for PMLs, 0.25 for MSs)
-  -r REGION_SIZE        
-            region size in bp where KS-test is performed. (Default: 90 bp)
-  -o OUTPUT_FILE        
-            name of output file. (Default: analyzed data to stdout, log to stderr)
+singularity pull docker://oma219/spumoni:latest
+singularity run spumoni_latest.sif spumoni -h
 ```
-The script, `analyze_pml.py`, will output the analyzed data to `stdout`. To further understand the meaning of each column in the output, check out the following [README](https://github.com/oma219/spumoni/blob/main/analysis/README.md).
 
-# Example
-### Download and Compile
+Both sets of commands above will download the containers and run `spumoni` to print out the sub-commands that are available to run.
 
-```console
+**(2) Build from Source**
+
+To build from source, it requires the following dependences: `zlib`, `cmake`, `gcc`. See the [wiki](https://github.com/oma219/spumoni/wiki/3.-Installation) for detailed information.
+```sh
 git clone https://github.com/oma219/spumoni
 cd spumoni
 mkdir build && cd build
 cmake ..
-make
+make install
+
+export SPUMONI_BUILD_DIR=$(pwd)
+# use spumoni ...
+```
+After running that last command above, in the `build/` directory there will be a `spumoni` executable to use.
+
+## Step 1: Building an Index
+
+After installing SPUMONI on your machine, the first step would be to build an index over the reference you want to use for your experiment. This reference will be a FASTA file (and it can be a multi-FASTA for pan-genomes). SPUMONI allows you to either build it over a single FASTA file, or you can specify a list of genomes that you want to include in the index. [See the wiki for more details.](https://github.com/oma219/spumoni/wiki/4.-Building-SPUMONI-Indexes) 
+
+For example, if you would want to do host depletion, you could index a human genome and build both the matching statistic and pseudo-matching lengths index using the command below: 
+
+```sh
+./spumoni build -r human_genome.fa -M -P -m -o /path/to/index
+```
+The command above will build an index for the reference file you provide. This command uses `-M` and `-P` which means it will build an index for computing matching statistics (MSs), and another index for computing pseudo-matching statistics (PMLs). Our experiments show that using PMLs are more accurate at binary classification while also being ~3x faster, therefore that would be our recommendation. The `-o` flag provides an output prefix for SPUMONI to use so it can build the index and any intermediate files it needs.
+
+## Step 2: Running Classification
+
+Once you have an index for desired experiment, you can use the `spumoni run` command to generate either MSs or PMLs for each read against the reference file that you just indexed. Now at this step, you provide the output prefix that was used to build the index.
+
+```sh
+./spumoni run -r /path/to/index -p reads.fa -P -c
 ```
 
-### Run on Example Data
+This command uses `-P` for computing PMLs (if you want MSs, use `-M` instead) which will be used to classify the reads. Additionally, the command uses the `-c` option to write out the classifications to a report file.
 
-```console
-// Builds both SPUMONI and MONI-ms indexes for both positive and null indexes 
-// Takes about ~3 minutes for each index
-python3 moni build -r ../data/example_positive_index/mock_comm_positive.fasta -f --spumoni --moni-ms
-python3 moni build -r ../data/example_null_index/mock_comm_null.fasta -f --spumoni --moni-ms
+## Getting Help
 
-// Computes pseudo matching lengths against both positive and null indexes
-python3 moni pseudo-ms -i ../data/example_positive_index/mock_comm_positive.fasta \
-                       -p ../data/example_reads/all_reads.fa
-python3 moni pseudo-ms -i ../data/example_null_index/mock_comm_null.fasta \
-                       -p ../data/example_reads/all_reads.fa
+If you run into any issues or have any questions, please feel free to reach out to us either (1) through GitHub Issues or (2) reach out to me at omaryfekry [at] gmail.com
 
-// Computes matching statistics lengths against both positive and null indexes
-python3 moni ms -i ../data/example_positive_index/mock_comm_positive.fasta \
-                -p ../data/example_reads/all_reads.fa
-python3 moni ms -i ../data/example_null_index/mock_comm_null.fasta \
-                -p ../data/example_reads/all_reads.fa
+## Why "MONI" and "SPUMONI"?
 
-// Analyze the pseudo matching lengths (move to analysis folder first)
-cd ../analysis
-python3 analyze_pml.py -p ../data/example_reads/all_reads.fa_mock_comm_positive.fasta.pseudo_lengths \
-                       -n ../data/example_reads/all_reads.fa_mock_comm_null.fasta.pseudo_lengths \
-                        > pml_analysis.txt
+**MONI** is the Finnish word for *multi*.
 
-// Analyze the matching statistic lengths
-python3 analyze_pml.py --ms -p ../data/example_reads/all_reads.fa_mock_comm_positive.fasta.lengths \
-                            -n ../data/example_reads/all_reads.fa_mock_comm_positive.fasta.lengths \
-                             > ms_analysis.txt
-```
+**SPUMONI** stands for Streaming PseUdo MONI.
 
-# External resources
+## Citing SPUMONI
+
+If you use the SPUMONI or MONI tools in your research project, please cite:
+>Ahmed, O., Rossi, M., Kovaka, S., Schatz, M. C., Gagie, T., Boucher, C., & Langmead, B. (2021). Pan-genomic 
+Matching Statistics for Targeted Nanopore Sequencing. iScience, 102696.
+
+> Rossi, M., Oliva, M., Langmead, B., Gagie, T., & Boucher, C. (2021). MONI: A Pangenomics Index for Finding MEMs. *Proc*. RECOMB.
+
+## References
+
+[1] Hideo Bannai, Travis Gagie, and Tomohiro I, *"Refining ther-index"*, Theoretical Computer Science, 812 (2020), pp. 96–108
+
+[2] Christina Boucher, Travis Gagie, Alan Kuhnle and Giovanni Manzini, *"Prefix-Free Parsing for Building Big BWTs"*, In Proc. of the 18th International Workshop on Algorithms in Bioinformatics (WABI 2018).
+
+[3] Christina Boucher, Travis Gagie, Alan Kuhnle, Ben Langmead, Giovanni Manzini, and Taher Mun. *"Prefix-free parsing for building big BWTs."*, Algorithms for Molecular Biology 14, no. 1 (2019): 13.
+
+## External Resources
 
 * [Big-BWT](https://github.com/alshai/Big-BWT.git)
     * [gSACA-K](https://github.com/felipelouza/gsa-is.git)
@@ -151,75 +102,3 @@ python3 analyze_pml.py --ms -p ../data/example_reads/all_reads.fa_mock_comm_posi
 * [shaped_slp](https://github.com/maxrossi91/ShapedSlp.git)
 <!-- * [Google Benchmark](https://github.com/google/benchmark.git)
     * [Google Test](https://github.com/google/googletest) -->
-
-# Citation 
-
-Please, if you use this tool in an academic setting cite the following papers:
-
-### MONI
-    @inproceedings{RossiOLGB21,
-    author      = { Massimiliano Rossi and 
-                    Marco Oliva and
-                    Ben Langmead and
-                    Travis Gagie and
-                    Christina Boucher},
-    title       = {MONI: A Pangenomics Index for Finding MEMs},
-    booktitle   = {Research in Computational Molecular Biology - 25th Annual 
-                    International Conference, {RECOMB} 2021, Padova, Italy},
-    volume      = {},
-    series      = {Lecture Notes in Computer Science},
-    pages       = {},
-    publisher   = {Springer},
-    year        = {2021}
-    }
-
-### SPUMONI
-
-    @article{AhmedRGBL21,
-    author      = { Omar Ahmed and
-                    Massimiliano Rossi and
-                    Travis Gagie and
-                    Christina Boucher and
-                    Ben Langmead},
-    title       = {Pan-genomic Matching Statistics for Targeted Nanopore Sequencing},
-    journal     = {CoRR},
-    volume      = {abs/xxxx.xxxxx},
-    year        = {2020},
-    url         = {https://arxiv.org/abs/xxxx.xxxxx},
-    archivePrefix = {arXiv},
-    eprint      = {xxxx.xxxxx},
-    }
-# Authors
-
-### Theoretical results:
-
-* Omar Ahmed [![Generic badge](https://img.shields.io/badge/SPUMONI--<COLOR>.svg)](https://shields.io/)
-* Christina Boucher
-* Travis Gagie
-* Ben Langmead
-* Massimiliano Rossi
-
-### Implementation:
-
-* [Omar Ahmed](https://github.com/oma219) [![Generic badge](https://img.shields.io/badge/SPUMONI--<COLOR>.svg)](https://shields.io/)
-* [Massimiliano Rossi](https://github.com/maxrossi91)
-
-### Experiments
-
-* [Omar Ahmed](https://github.com/oma219) [![Generic badge](https://img.shields.io/badge/SPUMONI--<COLOR>.svg)](https://shields.io/)
-* [Marco Oliva](https://github.com/marco-oliva) [![Generic badge](https://img.shields.io/badge/MONI--<COLOR>.svg)](https://shields.io/)
-* [Massimiliano Rossi](https://github.com/maxrossi91)
-
-# Why "MONI" and "SPUMONI"?
-
-**MONI** is the Finnish word for *multi*.
-
-**SPUMONI** stands for Streaming PseUdo MONI.
-
-# References
-
-[1] Hideo Bannai, Travis Gagie, and Tomohiro I, *"Refining ther-index"*, Theoretical Computer Science, 812 (2020), pp. 96–108
-
-[2] Christina Boucher, Travis Gagie, Alan Kuhnle and Giovanni Manzini, *"Prefix-Free Parsing for Building Big BWTs"*, In Proc. of the 18th International Workshop on Algorithms in Bioinformatics (WABI 2018).
-
-[3] Christina Boucher, Travis Gagie, Alan Kuhnle, Ben Langmead, Giovanni Manzini, and Taher Mun. *"Prefix-free parsing for building big BWTs."*, Algorithms for Molecular Biology 14, no. 1 (2019): 13.
